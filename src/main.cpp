@@ -3,6 +3,17 @@
 
 #include "r1-measurement.h"
 
+ESP01_STATE receiveDataHandler(const int link, const char* data, int length) {
+  if (strncmp("R1", data, length) == 0) {
+    String R1 = String(getR1(), 2);
+    esp01Send(link, R1.c_str(), R1.length());
+  }
+
+	return RECEIVE;
+}
+
+ESP01_STATE esp01_state = AT_COMMAND;
+
 void setup() {
   Serial.begin(115200);
   Serial.println("minipro-esp01");
@@ -12,125 +23,91 @@ void setup() {
   setupR1();
 }
 
-ESP01_STATE esp01_state = AT_COMMAND;
-
-ESP01_STATE atResponseHandler(const char* response, size_t length) {
-	ESP01_STATE new_state = SOFTAP_MODE_COMMAND;
-
-	Serial.println(F("new state: SOFTAP_MODE_COMMAND"));
-	return new_state;
-}
-
-ESP01_STATE staModeResponseHandler(const char* response, size_t length) {
-	ESP01_STATE new_state = WIFI_CONNECT_COMMAND;
-
-	Serial.println(F("new state: WIFI_CONNECT_COMMAND"));
-	return new_state;
-}
-
-ESP01_STATE softapModeResponseHandler(const char* response, size_t length) {
-	ESP01_STATE new_state = WIFI_CHECK_COMMAND;
-
-	Serial.println(F("new state: WIFI_CHECK_COMMAND"));
-	return new_state;
-}
-
-ESP01_STATE wifiConnectResponseHandler(const char* response, size_t length) {
-	ESP01_STATE new_state = WIFI_CHECK_COMMAND;
-
-	Serial.println(F("new state: WIFI_CHECK_COMMAND"));
-	return new_state;
-}
-
-ESP01_STATE wifiCheckResponseHandler(const char* response, size_t length) {
-	ESP01_STATE new_state = IP_MUX_ON_COMMAND;
-
-	Serial.println(F("new state: IP_MUX_ON_COMMAND"));
-	return new_state;
-}
-
-ESP01_STATE ipMuxOnResponseHandler(const char* response, size_t length) {
-	ESP01_STATE new_state = IP_SERVER_ON_COMMAND;
-
-	Serial.println(F("new state: IP_SERVER_ON_COMMAND"));
-	return new_state;
-}
-
-ESP01_STATE ipServerOnResponseHandler(const char* response, size_t length) {
-	ESP01_STATE new_state = LISTEN;
-
-	Serial.println(F("new state: LISTEN"));
-	return new_state;
-}
-
-ESP01_STATE listenDataHandler(const char* data, size_t length) {
-	ESP01_STATE new_state = LISTEN;
-
-	Serial.println(F("new state: LISTEN"));
-	return new_state;
-}
-
 void loop() {
   switch(esp01_state) {
 
+    case RESTART_COMMAND:
+      if (esp01Command(RESTART, NULL) != -1) {
+        esp01_state = RESTART_RESPONSE;
+      }
+      break;
+
+    case RESTART_RESPONSE:
+      esp01_state = esp01Response(RESTART_RESPONSE, AT_COMMAND);
+      break;
+
     case AT_COMMAND:
-      esp01_state = esp01Command(AT) != -1 ? AT_RESPONSE : -1;
+      if (esp01Command(AT, NULL) != -1) {
+        esp01_state = AT_RESPONSE;
+      }
       break;
 
     case AT_RESPONSE:
-      esp01_state = esp01Response(AT_RESPONSE, &atResponseHandler);
+      esp01_state = esp01Response(AT_RESPONSE, SOFTAP_MODE_COMMAND);
       break;
 
     case STA_MODE_COMMAND:
-      esp01_state = esp01Command(STA_MODE) != -1 ? STA_MODE_RESPONSE : -1;
+      if (esp01Command(STA_MODE, NULL) != -1) {
+        esp01_state = STA_MODE_RESPONSE;
+      }
       break;
 
     case STA_MODE_RESPONSE:
-      esp01_state = esp01Response(STA_MODE_RESPONSE, &softapModeResponseHandler);
+      esp01_state = esp01Response(STA_MODE_RESPONSE, WIFI_CHECK_COMMAND);
       break;
 
     case SOFTAP_MODE_COMMAND:
-      esp01_state = esp01Command(SOFTAP_MODE) != -1 ? SOFTAP_MODE_RESPONSE : -1;
+      if (esp01Command(SOFTAP_MODE, NULL) != -1) {
+        esp01_state = SOFTAP_MODE_RESPONSE;
+      }
       break;
 
     case SOFTAP_MODE_RESPONSE:
-      esp01_state = esp01Response(SOFTAP_MODE_RESPONSE, &softapModeResponseHandler);
-      break;
-
-    case WIFI_CHECK_COMMAND:
-      esp01_state = esp01Command(WIFI_CHECK) != -1 ? WIFI_CHECK_RESPONSE : -1;
-      break;
-
-    case WIFI_CHECK_RESPONSE:
-      esp01_state = esp01Response(WIFI_CHECK_RESPONSE, &wifiCheckResponseHandler);
-      break;
-
-    case WIFI_CONNECT_COMMAND:
-      esp01_state = esp01Command(WIFI_CONNECT) != -1 ? WIFI_CONNECT_RESPONSE : -1;
-      break;
-
-    case WIFI_CONNECT_RESPONSE:
-      esp01_state = esp01Response(WIFI_CONNECT_RESPONSE, &wifiConnectResponseHandler);
+      esp01_state = esp01Response(SOFTAP_MODE_RESPONSE, IP_MUX_ON_COMMAND);
       break;
 
     case IP_MUX_ON_COMMAND:
-      esp01_state = esp01Command(IP_MUX_ON) != -1 ? IP_MUX_ON_RESPONSE : -1;
+      if (esp01Command(IP_MUX_ON, NULL) != -1) {
+        esp01_state = IP_MUX_ON_RESPONSE;
+      }
       break;
 
     case IP_MUX_ON_RESPONSE:
-      esp01_state = esp01Response(IP_MUX_ON_RESPONSE, &ipMuxOnResponseHandler);
+      esp01_state = esp01Response(IP_MUX_ON_RESPONSE, IP_SERVER_ON_COMMAND);
       break;
 
     case IP_SERVER_ON_COMMAND:
-      esp01_state = esp01Command(IP_SERVER_ON) != -1 ? IP_SERVER_ON_RESPONSE : -1;
+      if (esp01Command(IP_SERVER_ON, NULL) != -1) {
+        esp01_state = IP_SERVER_ON_RESPONSE;
+      }
       break;
 
     case IP_SERVER_ON_RESPONSE:
-      esp01_state = esp01Response(IP_SERVER_ON_RESPONSE, &ipServerOnResponseHandler);
+      esp01_state = esp01Response(IP_SERVER_ON_RESPONSE, WIFI_CONNECT_COMMAND);
       break;
 
-    case LISTEN:
-    	esp01_state = esp01Listen(&listenDataHandler);
+    case WIFI_CONNECT_COMMAND:
+      if (esp01Command(WIFI_CONNECT, NULL) != -1) {
+        esp01_state = WIFI_CONNECT_RESPONSE;
+      }
+      break;
+
+    case WIFI_CONNECT_RESPONSE:
+      esp01_state = esp01Response(WIFI_CONNECT_RESPONSE, WIFI_CHECK_COMMAND);
+      break;
+
+    case WIFI_CHECK_COMMAND:
+      if (esp01Command(WIFI_CHECK, NULL) != -1) {
+        esp01_state = WIFI_CHECK_RESPONSE;
+      }
+      break;
+
+    case WIFI_CHECK_RESPONSE:
+      esp01_state = esp01Response(WIFI_CHECK_RESPONSE, RECEIVE);
+      break;
+
+    case RECEIVE:
+    	esp01_state = esp01Receive(&receiveDataHandler);
       break;
 
   }

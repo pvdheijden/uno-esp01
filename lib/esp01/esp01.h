@@ -21,7 +21,8 @@ typedef enum _AT_COMMAND_ID {
 	WIFI_CHECK = 5,
 	WIFI_CONNECT = 6,
 	IP_MUX_ON = 7,
-	IP_SERVER_ON = 8
+	IP_SERVER_ON = 8,
+	IP_SEND = 9
 } AT_COMMAND_ID;
 
 static const char AT_command[] PROGMEM = "AT\r\n";
@@ -30,9 +31,10 @@ static const char VERSION_command[] PROGMEM = "AT+GMR\r\n";
 static const char STA_MODE_command[] PROGMEM = "AT+CWMODE=1\r\n";
 static const char SOFTAP_MODE_command[] PROGMEM = "AT+CWMODE=3\r\n";
 static const char WIFI_CHECK_command[] PROGMEM = "AT+CIFSR\r\n";
-static const char WIFI_CONNECT_command[] PROGMEM = "AT+CWJAP=\"Spoetnik\",\"smilingowl440\"\r\n";
+static const char WIFI_CONNECT_command[] PROGMEM = "AT+CWJAP=\"NETGEAR34\",\"smilingowl440\"\r\n";
 static const char IP_MUX_ON_command[] PROGMEM = "AT+CIPMUX=1\r\n";
 static const char IP_SERVER_ON_command[] PROGMEM = "AT+CIPSERVER=1,3333\r\n";
+static const char IP_SEND_command[] PROGMEM = "AT+CIPSENDEX";
 
 PGM_P const at_commands[] PROGMEM = {
 	AT_command,
@@ -43,10 +45,11 @@ PGM_P const at_commands[] PROGMEM = {
 	WIFI_CHECK_command,
 	WIFI_CONNECT_command,
 	IP_MUX_ON_command,
-	IP_SERVER_ON_command
+	IP_SERVER_ON_command,
+	IP_SEND_command
 };
 
-size_t const at_command_lengths[] = {
+int const at_command_lengths[] = {
 	strlen(AT_command),
 	strlen(RESTART_command),
 	strlen(VERSION_command),
@@ -55,10 +58,11 @@ size_t const at_command_lengths[] = {
 	strlen(WIFI_CHECK_command),
 	strlen(WIFI_CONNECT_command),
 	strlen(IP_MUX_ON_command),
-	strlen(IP_SERVER_ON_command)
+	strlen(IP_SERVER_ON_command),
+	strlen(IP_SEND_command)
 };
 
-typedef enum _RESPONSE_STATUS {
+typedef enum _ESP01_MESSAGE {
 	OK = 0,
 	READY = 1,
 	ERROR = 2,
@@ -73,68 +77,70 @@ typedef enum _RESPONSE_STATUS {
 	SOFTAP_CONNECTED = 11,
 	SOFTAP_DIST_STA_IP = 12,
 	SOFTAP_STA_DISCONNECTED = 13
-} RESPONSE_STATUS;
+} ESP01_MESSAGE;
 
-static const char OK_status[] PROGMEM = "OK\r\n";
-static const char READY_status[] PROGMEM = "ready\r\n";
-static const char ERROR_status[] PROGMEM = "ERROR\r\n";
-static const char WIFI_CONNECTED_status[] PROGMEM = "WIFI CONNECTED\r\n";
-static const char WIFI_GOT_IP_status[] PROGMEM = "WIFI GOT IP\r\n";
-static const char WIFI_DISCONNECT_status[] PROGMEM = "WIFI DISCONNECT\r\n";
-static const char BUSY_S_status[] PROGMEM = "busy s...\r\n";
-static const char BUSY_P_status[] PROGMEM = "busy p...\r\n";
-static const char NETWORK_CONNECT_status[] PROGMEM = ",CONNECT\r\n";
-static const char NETWORK_CLOSED_status[] PROGMEM = ",CLOSED\r\n";
-static const char NETWORK_IPD_status[] PROGMEM = "+IPD\r\n";
-static const char SOFTAP_CONNECTED_status[] PROGMEM = "+STA_CONNECTED:\r\n";
-static const char SOFTAP_DIST_STA_IP_status[] PROGMEM = "+DIST_STA_IP:\r\n";
-static const char SOFTAP_DISCONNECTED_status[] PROGMEM = "+STA_DISCONNECTED:\r\n";
+static const char OK_message[] PROGMEM = "OK\r\n";
+static const char READY_message[] PROGMEM = "ready\r\n";
+static const char ERROR_message[] PROGMEM = "ERROR\r\n";
+static const char WIFI_CONNECTED_message[] PROGMEM = "WIFI CONNECTED\r\n";
+static const char WIFI_GOT_IP_message[] PROGMEM = "WIFI GOT IP\r\n";
+static const char WIFI_DISCONNECT_message[] PROGMEM = "WIFI DISCONNECT\r\n";
+static const char BUSY_S_message[] PROGMEM = "busy s...\r\n";
+static const char BUSY_P_message[] PROGMEM = "busy p...\r\n";
+static const char NETWORK_CONNECT_message[] PROGMEM = ",CONNECT\r\n";
+static const char NETWORK_CLOSED_message[] PROGMEM = ",CLOSED\r\n";
+static const char NETWORK_IPD_message[] PROGMEM = "+IPD";
+static const char SOFTAP_CONNECTED_message[] PROGMEM = "+STA_CONNECTED:\r\n";
+static const char SOFTAP_DIST_STA_IP_message[] PROGMEM = "+DIST_STA_IP:\r\n";
+static const char SOFTAP_DISCONNECTED_message[] PROGMEM = "+STA_DISCONNECTED:\r\n";
 
-PGM_P const response_status[] PROGMEM = {
-	OK_status,
-	READY_status,
-	ERROR_status,
-	WIFI_CONNECTED_status,
-	WIFI_GOT_IP_status,
-	WIFI_DISCONNECT_status,
-	BUSY_S_status,
-	BUSY_P_status,
-	NETWORK_CONNECT_status,
-	NETWORK_CLOSED_status,
-	NETWORK_IPD_status,
-	SOFTAP_CONNECTED_status,
-	SOFTAP_DIST_STA_IP_status,
-	SOFTAP_DISCONNECTED_status
+PGM_P const esp01_message[] PROGMEM = {
+	OK_message,
+	READY_message,
+	ERROR_message,
+	WIFI_CONNECTED_message,
+	WIFI_GOT_IP_message,
+	WIFI_DISCONNECT_message,
+	BUSY_S_message,
+	BUSY_P_message,
+	NETWORK_CONNECT_message,
+	NETWORK_CLOSED_message,
+	NETWORK_IPD_message,
+	SOFTAP_CONNECTED_message,
+	SOFTAP_DIST_STA_IP_message,
+	SOFTAP_DISCONNECTED_message
 };
 
-size_t const response_status_lengths[] = {
-	strlen(OK_status),
-	strlen(READY_status),
-	strlen(ERROR_status),
-	strlen(WIFI_CONNECTED_status),
-	strlen(WIFI_GOT_IP_status),
-	strlen(WIFI_DISCONNECT_status),
-	strlen(BUSY_S_status),
-	strlen(BUSY_P_status),
-	strlen(NETWORK_CONNECT_status),
-	strlen(NETWORK_CLOSED_status),
-	strlen(NETWORK_IPD_status),
-	strlen(SOFTAP_CONNECTED_status),
-	strlen(SOFTAP_DIST_STA_IP_status),
-	strlen(SOFTAP_DISCONNECTED_status)
+size_t const esp01_message_lengths[] = {
+	strlen(OK_message),
+	strlen(READY_message),
+	strlen(ERROR_message),
+	strlen(WIFI_CONNECTED_message),
+	strlen(WIFI_GOT_IP_message),
+	strlen(WIFI_DISCONNECT_message),
+	strlen(BUSY_S_message),
+	strlen(BUSY_P_message),
+	strlen(NETWORK_CONNECT_message),
+	strlen(NETWORK_CLOSED_message),
+	strlen(NETWORK_IPD_message),
+	strlen(SOFTAP_CONNECTED_message),
+	strlen(SOFTAP_DIST_STA_IP_message),
+	strlen(SOFTAP_DISCONNECTED_message)
 };
 
-inline bool isResponseStatus(RESPONSE_STATUS status, const char* response) {
-	return strncmp_P(response, (PGM_P)pgm_read_word(&(response_status[status])), response_status_lengths[status] ) == 0 ? true : false;
+inline bool isEsp01Message(ESP01_MESSAGE message, const char* data) {
+	return strncmp_P(data, (PGM_P)pgm_read_word(&(esp01_message[message])), esp01_message_lengths[message] ) == 0 ? true : false;
 }
 
 /**
  * Command and response states
  */
 typedef enum _ESP01_STATE {
-	LISTEN,
+	RECEIVE,
 	AT_COMMAND,
 	AT_RESPONSE,
+	RESTART_COMMAND,
+	RESTART_RESPONSE,
 	VERSION_COMMAND,
 	VERSION_RESPONSE,
 	STA_MODE_COMMAND,
@@ -149,12 +155,15 @@ typedef enum _ESP01_STATE {
 	IP_MUX_ON_RESPONSE,
 	IP_SERVER_ON_COMMAND,
 	IP_SERVER_ON_RESPONSE,
+	IP_SEND_COMMAND,
+	IP_SEND_RESPONSE
 
 } ESP01_STATE;
 
 void esp01Init();
-size_t esp01Command(AT_COMMAND_ID);
-ESP01_STATE esp01Response(ESP01_STATE, ESP01_STATE (*)(const char*, const size_t));
-ESP01_STATE esp01Listen(ESP01_STATE (*)(const char*, const size_t));
+int esp01Command(AT_COMMAND_ID, const char*, ...);
+ESP01_STATE esp01Response(ESP01_STATE, ESP01_STATE);
+ESP01_STATE esp01Receive(ESP01_STATE (*)(const int, const char*, const int));
+ESP01_STATE esp01Send(const int, const char*, const int);
 
 #endif /* ESP01_ESP01_H_ */
