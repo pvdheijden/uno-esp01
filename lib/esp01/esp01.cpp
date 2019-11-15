@@ -147,15 +147,17 @@ ESP01_STATE esp01Receive(ESP01_STATE (*data_handler)(int connection, const char*
 };
 
 ESP01_STATE esp01Send(const int link, const char* data, const int length) {
-	if (esp01Command(IP_SEND, "=%d,%d\r\n", link, length) != -1) {
+	if (esp01Command(IP_SEND, "=%d,%d\r\n", link, length + 2) != -1) {
 		delay(20);	// TODO wait for ">EOT" character sequence before sending the data.
 		esp01Response(RECEIVE, RECEIVE);
 
 		Serial.print("data: |");
 	  Serial.write(data, length);
+		Serial.write("\r\n");
   	Serial.println("|");
 
 		esp01Serial.write(data, length);
+		esp01Serial.write("\r\n");
 	};
 
 	return RECEIVE;

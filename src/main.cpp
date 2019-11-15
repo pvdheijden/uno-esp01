@@ -16,7 +16,7 @@ ESP01_STATE esp01_state = AT_COMMAND;
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("minipro-esp01");
+  Serial.println("uno-esp01");
 
   esp01Init();
 
