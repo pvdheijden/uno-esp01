@@ -128,42 +128,35 @@ size_t const esp01_message_lengths[] = {
 	strlen(SOFTAP_DISCONNECTED_message)
 };
 
-inline bool isEsp01Message(ESP01_MESSAGE message, const char* data) {
-	return strncmp_P(data, (PGM_P)pgm_read_word(&(esp01_message[message])), esp01_message_lengths[message] ) == 0 ? true : false;
-}
+class SoftwareSerial;
 
-/**
- * Command and response states
- */
-typedef enum _ESP01_STATE {
-	RECEIVE,
-	AT_COMMAND,
-	AT_RESPONSE,
-	RESTART_COMMAND,
-	RESTART_RESPONSE,
-	VERSION_COMMAND,
-	VERSION_RESPONSE,
-	STA_MODE_COMMAND,
-	STA_MODE_RESPONSE,
-	SOFTAP_MODE_COMMAND,
-	SOFTAP_MODE_RESPONSE,
-	WIFI_CHECK_COMMAND,
-	WIFI_CHECK_RESPONSE,
-	WIFI_CONNECT_COMMAND,
-	WIFI_CONNECT_RESPONSE,
-	IP_MUX_ON_COMMAND,
-	IP_MUX_ON_RESPONSE,
-	IP_SERVER_ON_COMMAND,
-	IP_SERVER_ON_RESPONSE,
-	IP_SEND_COMMAND,
-	IP_SEND_RESPONSE
+#define TX_BUFFER_SIZE 128
+#define RX_BUFFER_SIZE 128
 
-} ESP01_STATE;
+class Esp01 {
+	private:
+		SoftwareSerial* _p_esp01Serial;
 
-void esp01Init();
-int esp01Command(AT_COMMAND_ID, const char*, ...);
-ESP01_STATE esp01Response(ESP01_STATE, ESP01_STATE);
-ESP01_STATE esp01Receive(ESP01_STATE (*)(const int, const char*, const int));
-ESP01_STATE esp01Send(const int, const char*, const int);
+		char _tx_buffer[TX_BUFFER_SIZE];
+		int _tx_length;
+		char _rx_buffer[RX_BUFFER_SIZE];
+		int _rx_length;
+
+		char* _rx = _rx_buffer;
+
+	public:
+		Esp01();
+		~Esp01();
+
+		int atCommand(AT_COMMAND_ID);
+		int atCommand(AT_COMMAND_ID, const char*, ...);
+		int atResponse(int (*)(const char*, const int), const bool = true);
+		int atEmptyResponseHandler(const char*, const int);
+
+		bool isMessage(ESP01_MESSAGE message, const char* data);
+
+		int dataReceive(int (*)(const int, const char*, const int));
+		int dataSend(const int, const char*, const int);
+};
 
 #endif /* ESP01_ESP01_H_ */

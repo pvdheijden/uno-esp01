@@ -1,22 +1,17 @@
 #include <Arduino.h>
 
-#define VIN A0
-#define VOUT A1
-#define CONTROL 10
+#include "r1-measurement.h"
 
-static const float vref = 5.0;
-static float vin; //a0 measurement
-static float vout; // a1 measurement
-static float r1;
-static const float r2 = 1000.0;
-
-void setupR1() {
+R1Measurement::R1Measurement() {
   pinMode(CONTROL, OUTPUT);
   digitalWrite(CONTROL, LOW);
 }
 
-void updateR1() {
+void R1Measurement::update() {
   if (millis() % 1000 == 0) {
+    float vin; //a0 measurement
+    float vout; // a1 measurement
+
     digitalWrite(CONTROL, HIGH);
     delay(1);
 
@@ -28,17 +23,17 @@ void updateR1() {
      * R1 = R2 * (Vin / Vout – 1)
      */
 
-    vin = vref * ((float)analogRead(VIN) / 1024.0);
+    vin = _vref * ((float)analogRead(VIN) / 1024.0);
     //Serial.println(vin, 6);
-    vout = vref * ((float)analogRead(VOUT) / 1024.0);
+    vout = _vref * ((float)analogRead(VOUT) / 1024.0);
     //Serial.println(vout, 6);
-    r1 = ((vin / vout) - 1) * r2;
+    _r1 = ((vin / vout) - 1) * _r2;
     //Serial.println(r1, 6);
     
     digitalWrite(CONTROL, LOW);
   }
 }
 
-float getR1() {
-  return r1;
+float R1Measurement::get() {
+  return _r1;
 }

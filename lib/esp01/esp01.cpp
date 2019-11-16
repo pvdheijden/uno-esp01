@@ -9,157 +9,188 @@
 
 #include <HardwareSerial.h>
 #include <SoftwareSerial.h>
-static SoftwareSerial esp01Serial = SoftwareSerial(5, 6);
 
 #include "esp01.h"
 
-#define TX_BUFFER_SIZE 128
-#define RX_BUFFER_SIZE 128
-
-static char tx_buffer[TX_BUFFER_SIZE];
-static int tx_length;
-static char rx_buffer[RX_BUFFER_SIZE];
-static int rx_length;
-static char* rx = rx_buffer;
-
-void esp01Init() {
-	esp01Serial.begin(9600);
+Esp01::Esp01() {
+	_p_esp01Serial = new SoftwareSerial(5, 6);
+	_p_esp01Serial->begin(9600);
 }
 
-int esp01Command(AT_COMMAND_ID command_id, const char* format, ...) {
-  memset(tx_buffer, '\0', TX_BUFFER_SIZE);
-  strcpy_P(tx_buffer, (PGM_P)pgm_read_word(&(at_commands[command_id])));
-  tx_length = at_command_lengths[command_id];
+Esp01::~Esp01() {
+	delete(_p_esp01Serial);
+}
+
+/**
+ * Send AT-command to ESP-01 module.
+ * 
+ * Returns number of bytes send, or -1 if an error occured
+ */
+int Esp01::atCommand(AT_COMMAND_ID command_id) {
+	return atCommand(command_id, NULL);
+}
+
+int Esp01::atCommand(AT_COMMAND_ID command_id, const char* format, ...) {
+  memset(_tx_buffer, '\0', TX_BUFFER_SIZE);
+  strcpy_P(_tx_buffer, (PGM_P)pgm_read_word(&(at_commands[command_id])));
+  _tx_length = at_command_lengths[command_id];
 
 	if (format != NULL) {
 		va_list args;
 		va_start(args, format);
-		vsprintf(tx_buffer + tx_length, format, args);
-		tx_length = strlen(tx_buffer);
+		vsprintf(_tx_buffer + _tx_length, format, args);
+		_tx_length = strlen(_tx_buffer);
 	}
 
   Serial.print("tx_buffer: |");
-  Serial.write(tx_buffer, tx_length);
+  Serial.write(_tx_buffer, _tx_length);
   Serial.println("|");
 
-	return esp01Serial.write(tx_buffer, tx_length) == tx_length ? tx_length : -1;
+	return (int)(_p_esp01Serial->write(_tx_buffer, _tx_length)) == _tx_length ? _tx_length : -1;
 }
 
-ESP01_STATE esp01Response(ESP01_STATE current_state, ESP01_STATE next_state) {
-	while (esp01Serial.available()) {
-		*rx = esp01Serial.read();
+bool Esp01::isMessage(ESP01_MESSAGE message, const char* data) {
+	return strncmp_P(data, (PGM_P)pgm_read_word(&(esp01_message[message])), esp01_message_lengths[message] ) == 0 ? true : false;
+}
 
-		/*
-		Serial.print(*rx, HEX);
-		Serial.print(".");
-		*/
 
-		// Echo of the AT command followed by the sequence: "\r\r\n"
-		if (*rx == '\n' && *(rx - 1) == '\r' && *(rx -2) == '\r') {
-			memset(rx_buffer, '\0', RX_BUFFER_SIZE);
-			rx = rx_buffer;
+/**
+ * Receives the response on an AT command.
+ * 
+ * Returns the number of bytes received (0 in case no bytes available) 
+ * or -1 if an error occured.
+ */
+int Esp01::atResponse(int (*response_handler)(const char*, const int), const bool wait) {
+	do {
+		while (_p_esp01Serial->available()) {
+			*_rx = _p_esp01Serial->read();
 
-			continue;
-		}
+			/*
+			Serial.print(*rx, HEX);
+			Serial.print(".");
+			*/
 
-		// The AT response followed by the sequence: "\r\n"
-		if (*rx == '\n' && *(rx - 1) == '\r' && (rx - 1) - rx_buffer > 0) {
-			rx++;
+			// Echo of the AT command followed by the sequence: "\r\r\n"
+			if (*_rx == '\n' && *(_rx - 1) == '\r' && *(_rx -2) == '\r') {
+				memset(_rx_buffer, '\0', RX_BUFFER_SIZE);
+				_rx = _rx_buffer;
 
-			if (isEsp01Message(OK, rx - esp01_message_lengths[OK])) {
-				rx_length = rx - rx_buffer;
-				rx = rx_buffer;	// reset rx
-
-				Serial.print("rx_buffer: |");
-				Serial.write(rx_buffer, rx_length);
-				Serial.println("|");
-
-				return next_state;
+				continue;
 			}
 
-			continue;
+			// The AT response followed by the sequence: "\r\n"
+			if (*_rx == '\n' && *(_rx - 1) == '\r' && (_rx - 1) - _rx_buffer > 0) {
+				_rx++;
+
+				if (isMessage(OK, _rx - esp01_message_lengths[OK]) || 
+						isMessage(ERROR, _rx - esp01_message_lengths[ERROR])) {
+					_rx_length = _rx - _rx_buffer;
+					_rx = _rx_buffer;	// reset rx
+
+					Serial.print("rx_buffer: |");
+					Serial.write(_rx_buffer, _rx_length);
+					Serial.println("|");
+
+					return response_handler == NULL 
+						? atEmptyResponseHandler(_rx_buffer, _rx_length) 
+						: response_handler(_rx_buffer, _rx_length);
+				}	
+				
+				continue;
+			}
+
+			// ... store the character
+			_rx++;
 		}
 
-		// ... store the character
-		rx++;
-	}
+		if (wait) {
+			delay(20);
+		}
 
-	return current_state;
+	} while (wait);
+
+	return 0;
 }
 
-ESP01_STATE esp01Receive(ESP01_STATE (*data_handler)(int connection, const char*, const int)) {
-	while (esp01Serial.available()) {
-		*rx = esp01Serial.read();
+int Esp01::atEmptyResponseHandler(const char* response, const int length) {
+	return isMessage(ERROR, response) ? -1 : length;
+}
 
-/*
-		Serial.print(*rx, HEX);
-		Serial.print(".");
-*/
+int Esp01::dataReceive(int (*data_handler)(int connection, const char*, const int)) {
+	while (_p_esp01Serial->available()) {
+		*_rx = _p_esp01Serial->read();
 
-		if (*rx == '\n' && *(rx - 1) == '\r') {
-			rx++;
+		/*
+				Serial.print(*rx, HEX);
+				Serial.print(".");
+		*/
 
-			rx_length = rx - rx_buffer;
+		if (*_rx == '\n' && *(_rx - 1) == '\r') {
+			_rx++;
+
+			_rx_length = _rx - _rx_buffer;
 			Serial.print("rx_buffer: |");
-			Serial.write(rx_buffer, rx_length);
+			Serial.write(_rx_buffer, _rx_length);
 			Serial.println("|");
 
 			int link;
-			if (isEsp01Message(NETWORK_CONNECT, rx - esp01_message_lengths[NETWORK_CONNECT])) {
-				rx = rx_buffer;
+			if (isMessage(NETWORK_CONNECT, _rx - esp01_message_lengths[NETWORK_CONNECT])) {
+				_rx = _rx_buffer;
 
-				link = atoi(strtok(rx_buffer, ","));
+				link = atoi(strtok(_rx_buffer, ","));
 				Serial.print("open connection: ");
 				Serial.println(link);
-			} else if (isEsp01Message(NETWORK_CLOSED, rx - esp01_message_lengths[NETWORK_CLOSED])) {
-				rx = rx_buffer;
+			} else if (isMessage(NETWORK_CLOSED, _rx - esp01_message_lengths[NETWORK_CLOSED])) {
+				_rx = _rx_buffer;
 
-				link = atoi(strtok(rx_buffer, ","));
+				link = atoi(strtok(_rx_buffer, ","));
 				Serial.print("close connection: ");
 				Serial.println(link);
-			} else if (isEsp01Message(NETWORK_IPD, rx_buffer)) {
-				rx = strtok(rx_buffer, ","); // rx -> "+IPD"
-				rx = strtok(NULL, ","); // rx -> connection
-				link = atoi(rx);
-				rx = strtok(NULL, ","); // rx -> length
-				int length = atoi(rx);
-				rx = strtok(rx, ":");	// rx -> length
+			} else if (isMessage(NETWORK_IPD, _rx_buffer)) {
+				_rx = strtok(_rx_buffer, ","); // rx -> "+IPD"
+				_rx = strtok(NULL, ","); // rx -> connection
+				link = atoi(_rx);
+				_rx = strtok(NULL, ","); // rx -> length
+				int length = atoi(_rx);
+				_rx = strtok(_rx, ":");	// rx -> length
 				char* data = strtok(NULL, ":"); // rx -> data
 
 				Serial.print("data on connection: ");
 				Serial.println(link);
 
-				rx = rx_buffer;
+				_rx = _rx_buffer;
 
 				return data_handler(link, data, length - 2);
 			}
 			else {
-				rx = rx_buffer;			
+				_rx = _rx_buffer;			
 			}
 
 			continue;
 		}
 
-		rx++;
+		_rx++;
 	}
 
-	return RECEIVE;
+	return 0;
 };
 
-ESP01_STATE esp01Send(const int link, const char* data, const int length) {
-	if (esp01Command(IP_SEND, "=%d,%d\r\n", link, length + 2) != -1) {
+int Esp01::dataSend(const int link, const char* data, const int length) {
+	if (atCommand(IP_SEND, "=%d,%d\r\n", link, length + 2) != -1) {
 		delay(20);	// TODO wait for ">EOT" character sequence before sending the data.
-		esp01Response(RECEIVE, RECEIVE);
+		if (atResponse(NULL) != -1) {
+			Serial.print("data: |");
+			Serial.write(data, length);
+			Serial.write("\r\n");
+			Serial.println("|");
 
-		Serial.print("data: |");
-	  Serial.write(data, length);
-		Serial.write("\r\n");
-  	Serial.println("|");
+			_p_esp01Serial->write(data, length);
+			_p_esp01Serial->write("\r\n");
 
-		esp01Serial.write(data, length);
-		esp01Serial.write("\r\n");
+			return length + 2;
+		};
 	};
 
-	return RECEIVE;
+	return -1;
 };
 
