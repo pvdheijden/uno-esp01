@@ -1,13 +1,14 @@
 /*
- * at-command.h
+ * esp01-at.h
  *
  *  Created on: Nov 2, 2019
  *      Author: Pim
  */
 
-#ifndef ESP01_ESP01_H_
-#define ESP01_ESP01_H_
+#ifndef ESP01_AT_H_
+#define ESP01_AT_H_
 
+#include <Arduino.h>
 #include <string.h>
 /**
  * AT command definitions
@@ -49,20 +50,9 @@ PGM_P const at_commands[] PROGMEM = {
 	IP_SEND_command
 };
 
-int const at_command_lengths[] = {
-	strlen(AT_command),
-	strlen(RESTART_command),
-	strlen(VERSION_command),
-	strlen(STA_MODE_command),
-	strlen(SOFTAP_MODE_command),
-	strlen(WIFI_CHECK_command),
-	strlen(WIFI_CONNECT_command),
-	strlen(IP_MUX_ON_command),
-	strlen(IP_SERVER_ON_command),
-	strlen(IP_SEND_command)
-};
+#define AT_COMMAND_LENGTH(ID) (strlen(at_commands[ID]))
 
-typedef enum _ESP01_MESSAGE {
+typedef enum _ESP01_MESSAGE_ID {
 	OK = 0,
 	READY = 1,
 	ERROR = 2,
@@ -75,9 +65,9 @@ typedef enum _ESP01_MESSAGE {
 	NETWORK_CLOSED = 9,
 	NETWORK_IPD = 10,
 	SOFTAP_CONNECTED = 11,
-	SOFTAP_DIST_STA_IP = 12,
-	SOFTAP_STA_DISCONNECTED = 13
-} ESP01_MESSAGE;
+	SOFTAP_DIST_IP = 12,
+	SOFTAP_DISCONNECTED = 13
+} ESP01_MESSAGE_ID;
 
 static const char OK_message[] PROGMEM = "OK\r\n";
 static const char READY_message[] PROGMEM = "ready\r\n";
@@ -90,9 +80,9 @@ static const char BUSY_P_message[] PROGMEM = "busy p...\r\n";
 static const char NETWORK_CONNECT_message[] PROGMEM = ",CONNECT\r\n";
 static const char NETWORK_CLOSED_message[] PROGMEM = ",CLOSED\r\n";
 static const char NETWORK_IPD_message[] PROGMEM = "+IPD";
-static const char SOFTAP_CONNECTED_message[] PROGMEM = "+STA_CONNECTED:\r\n";
-static const char SOFTAP_DIST_STA_IP_message[] PROGMEM = "+DIST_STA_IP:\r\n";
-static const char SOFTAP_DISCONNECTED_message[] PROGMEM = "+STA_DISCONNECTED:\r\n";
+static const char SOFTAP_CONNECTED_message[] PROGMEM = "+STA_CONNECTED:";
+static const char SOFTAP_DIST_IP_message[] PROGMEM = "+DIST_STA_IP:";
+static const char SOFTAP_DISCONNECTED_message[] PROGMEM = "+STA_DISCONNECTED:";
 
 PGM_P const esp01_message[] PROGMEM = {
 	OK_message,
@@ -107,40 +97,23 @@ PGM_P const esp01_message[] PROGMEM = {
 	NETWORK_CLOSED_message,
 	NETWORK_IPD_message,
 	SOFTAP_CONNECTED_message,
-	SOFTAP_DIST_STA_IP_message,
+	SOFTAP_DIST_IP_message,
 	SOFTAP_DISCONNECTED_message
 };
 
-size_t const esp01_message_lengths[] = {
-	strlen(OK_message),
-	strlen(READY_message),
-	strlen(ERROR_message),
-	strlen(WIFI_CONNECTED_message),
-	strlen(WIFI_GOT_IP_message),
-	strlen(WIFI_DISCONNECT_message),
-	strlen(BUSY_S_message),
-	strlen(BUSY_P_message),
-	strlen(NETWORK_CONNECT_message),
-	strlen(NETWORK_CLOSED_message),
-	strlen(NETWORK_IPD_message),
-	strlen(SOFTAP_CONNECTED_message),
-	strlen(SOFTAP_DIST_STA_IP_message),
-	strlen(SOFTAP_DISCONNECTED_message)
-};
+#define ESP01_MESSAGE_LENGTH(ID) (strlen_P((PGM_P)pgm_read_ptr(&(esp01_message[ID]))))
 
 class SoftwareSerial;
 
-#define TX_BUFFER_SIZE 128
-#define RX_BUFFER_SIZE 128
+#define TX_BUFFER_SIZE 382
+#define RX_BUFFER_SIZE 382
 
 class Esp01 {
 	private:
 		SoftwareSerial* _p_esp01Serial;
 
 		char _tx_buffer[TX_BUFFER_SIZE];
-		int _tx_length;
 		char _rx_buffer[RX_BUFFER_SIZE];
-		int _rx_length;
 
 		char* _rx = _rx_buffer;
 
@@ -150,13 +123,13 @@ class Esp01 {
 
 		int atCommand(AT_COMMAND_ID);
 		int atCommand(AT_COMMAND_ID, const char*, ...);
-		int atResponse(int (*)(const char*, const int), const bool = true);
-		int atEmptyResponseHandler(const char*, const int);
+		int atResponse(int (*)(char*, int), const bool = true);
+		int atEmptyResponseHandler(char*, int);
 
-		bool isMessage(ESP01_MESSAGE message, const char* data);
+		bool isMessage(ESP01_MESSAGE_ID message, const char* data);
 
-		int dataReceive(int (*)(const int, const char*, const int));
-		int dataSend(const int, const char*, const int);
+		int dataReceive(int (*)(const int, char*, int));
+		int dataSend(const int, const char*, int);
 };
 
-#endif /* ESP01_ESP01_H_ */
+#endif /* ESP01_AT_H_ */
